@@ -6,17 +6,18 @@ import {
 } from 'lucide-react';
 import { COUNTRIES_META } from '../data/countries';
 import { GeneratedAddress, SupportedCountryCode } from '../types';
-
-interface USStateOption {
-  name: string;
-  code: string;
-  count: number;
-  isTaxFree: boolean;
-}
+import { 
+  getUSStates, 
+  getAddresses, 
+  getRandomSingleAddress, 
+  generateAddressesLocally, 
+  USStateOption 
+} from '../services/addressService';
 
 export const AddressGenerator: React.FC = () => {
   const [selectedCountry, setSelectedCountry] = useState<SupportedCountryCode>('US');
-  const [addresses, setAddresses] = useState<GeneratedAddress[]>([]);
+  // Initialize with instant local addresses so screen is NEVER empty or stuck at 0
+  const [addresses, setAddresses] = useState<GeneratedAddress[]>(() => generateAddressesLocally('US'));
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [reshufflingId, setReshufflingId] = useState<string | null>(null);
@@ -25,31 +26,31 @@ export const AddressGenerator: React.FC = () => {
   const [availableUSStates, setAvailableUSStates] = useState<USStateOption[]>([]);
   const [showOtherCountries, setShowOtherCountries] = useState<boolean>(false);
 
-  // Load US states from backend
+  // Load US states (works on Vercel, offline, or backend)
   useEffect(() => {
-    fetch('/api/us-states')
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && Array.isArray(data.states)) {
-          setAvailableUSStates(data.states);
+    getUSStates()
+      .then(states => {
+        if (Array.isArray(states) && states.length > 0) {
+          setAvailableUSStates(states);
         }
       })
       .catch(() => {});
   }, []);
 
-  // Fetch full address list (at least 10-35 addresses)
+  // Fetch address list (at least 10-35 addresses)
   const fetchAddressList = async (country: SupportedCountryCode, stateCode: string = 'ALL') => {
     setIsRefreshingAll(true);
     try {
-      const stateParam = country === 'US' && stateCode !== 'ALL' ? `&state=${stateCode}` : '';
-      const res = await fetch(`/api/live-address?country=${country}${stateParam}`);
-      const data = await res.json();
-
-      if (data.success && Array.isArray(data.addresses) && data.addresses.length > 0) {
-        setAddresses(data.addresses);
+      const list = await getAddresses(country, stateCode);
+      if (Array.isArray(list) && list.length > 0) {
+        setAddresses(list);
+      } else {
+        // Guarantee fallback
+        setAddresses(generateAddressesLocally(country, stateCode));
       }
     } catch (err) {
-      console.warn('Failed to fetch addresses:', err);
+      console.warn('Fallback to local addresses:', err);
+      setAddresses(generateAddressesLocally(country, stateCode));
     } finally {
       setIsRefreshingAll(false);
     }
@@ -66,12 +67,8 @@ export const AddressGenerator: React.FC = () => {
 
     setReshufflingId(target.id);
     try {
-      const stateParam = selectedCountry === 'US' && selectedUSState !== 'ALL' ? `&state=${selectedUSState}` : '';
-      const res = await fetch(`/api/live-address?country=${selectedCountry}&count=1${stateParam}`);
-      const data = await res.json();
-
-      if (data.success) {
-        const newAddr = (data.addresses && data.addresses[0]) || data;
+      const newAddr = await getRandomSingleAddress(selectedCountry, selectedUSState);
+      if (newAddr) {
         setAddresses(prev => {
           const next = [...prev];
           next[cardIndex] = newAddr;
