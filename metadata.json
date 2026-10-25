@@ -1,0 +1,6 @@
+{
+  "name": "iRegion Pro - iPhone Address & Developer Profile Generator",
+  "description": "Generate verified fake billing addresses for iPhone App Store region bypass, tax-free states, and Apple Developer test profiles.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
